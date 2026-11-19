@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pulse Log</string>
+    <string name="channel_name">Device connection</string>
+    <string name="channel_description">Shown while Pulse Log keeps a Bluetooth device connected.</string>
+</resources>
