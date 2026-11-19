@@ -10,7 +10,12 @@ fun setting(name: String): String =
 
 android {
     namespace = "com.example.pulselog"
-    compileSdk = 37
+    // Compose 1.13 needs the Android 17 QPR SDK (37.1 or later) to compile against.
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.pulselog"
