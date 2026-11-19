@@ -1,0 +1,8 @@
+// Build settings for the app target. Firebase values are optional; blank means local-only (UC-11).
+PULSELOG_FIREBASE_PROJECT_ID =
+PULSELOG_FIREBASE_APP_ID =
+PULSELOG_FIREBASE_API_KEY =
+PULSELOG_FIREBASE_SENDER_ID =
+
+// Copy Secrets.example.xcconfig to Secrets.xcconfig and fill it in. It is gitignored.
+#include? "Secrets.xcconfig"
