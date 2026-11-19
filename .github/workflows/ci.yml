@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  spec:
+    name: Shared spec and traceability
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Vectors match the Python reference
+        run: python3 spec/reference.py --check
+      - name: Every automated use case has a test
+        run: node scripts/traceability.mjs --check
+
+  android:
+    name: Android (Kotlin)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Core tests (shared vectors, queue, reconnect)
+        run: |
+          chmod +x gradlew
+          ./gradlew --stacktrace :core:test
+      - name: App unit tests, lint and debug build
+        run: ./gradlew --stacktrace :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Upload lint report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: android/app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+
+  ios-core:
+    name: iOS core (Swift package tests)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - run: xcodebuild -version
+      - name: Swift tests (shared vectors, queue, reconnect)
+        working-directory: ios/PulseLogCore
+        run: swift test
+
+  ios-app:
+    name: iOS app build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - run: xcodebuild -version
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project PulseLog.xcodeproj \
+            -scheme PulseLog \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO | tail -n 60
+
+  firestore-rules:
+    name: Firestore rules
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firebase/package-lock.json
+      - run: npm ci
+      - name: Rules tests on the Firestore emulator
+        run: npm run test:emulator
