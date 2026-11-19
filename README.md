@@ -95,7 +95,7 @@ This is a sample, not a medical device and not a certified product.
 
 ## Versions
 
-Checked November 2026. Android: AGP 9.5.1, Gradle 9.6.1, Kotlin 2.4.21, Compose BOM 2026.11.01, compileSdk 37, targetSdk 36, minSdk 26, Firebase BoM 35.2.0. iOS: Xcode 26, Swift 6.2 tools, iOS 17+, Firebase Apple SDK 13.2.0. Rules tests: firebase-tools 15.37.0, @firebase/rules-unit-testing 6.0.0, Node 22.
+Checked November 2026. Android: AGP 9.5.1, Gradle 9.6.1, Kotlin 2.4.21, Compose BOM 2026.11.01, compileSdk 37.2, targetSdk 36, minSdk 26, Firebase BoM 35.2.0. iOS: Xcode 26, Swift 6.2 tools, iOS 17+, Firebase Apple SDK 13.2.0. Rules tests: firebase-tools 15.37.0, @firebase/rules-unit-testing 6.0.0, Node 22.
 
 ## License
 
