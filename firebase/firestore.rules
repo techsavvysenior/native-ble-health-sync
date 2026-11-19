@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Pulse Log readings. Each user reads and writes only their own readings (UC-09). A reading can be
+// written again with identical data, which is how an app retries a batch safely, but it can never be
+// changed or deleted from a phone (UC-10). The document shape matches spec/gatt-vectors.json "documents",
+// which the Android and iOS tests build field for field.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function validHeartRate(d) {
+      let hr = d.heartRate;
+      return d.keys().hasOnly(['schema', 'deviceId', 'kind', 'receivedAtMs', 'payloadHex', 'platform', 'heartRate'])
+        && hr is map
+        && hr.keys().hasOnly(['bpm', 'sensorContact', 'energyExpendedKj', 'rr1024'])
+        && hr.bpm is int && hr.bpm > 0 && hr.bpm < 400
+        && hr.sensorContact in ['notSupported', 'notDetected', 'detected']
+        && (hr.energyExpendedKj == null || hr.energyExpendedKj is int)
+        && hr.rr1024 is list && hr.rr1024.size() <= 16;
+    }
+
+    function validBloodPressure(d) {
+      let bp = d.bloodPressure;
+      return d.keys().hasOnly(['schema', 'deviceId', 'kind', 'receivedAtMs', 'payloadHex', 'platform', 'bloodPressure'])
+        && bp is map
+        && bp.keys().hasOnly(['unit', 'systolic', 'diastolic', 'meanArterial', 'pulseRate', 'deviceTime', 'irregularPulse', 'bodyMovement'])
+        && bp.unit in ['mmHg', 'kPa']
+        && bp.systolic is number && bp.systolic > 0 && bp.systolic < 400
+        && bp.diastolic is number && bp.diastolic > 0 && bp.diastolic < 400
+        && (bp.meanArterial == null || bp.meanArterial is number)
+        && (bp.pulseRate == null || bp.pulseRate is number)
+        && (bp.deviceTime == null || (bp.deviceTime is string && bp.deviceTime.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$')))
+        && bp.irregularPulse is bool
+        && bp.bodyMovement is bool;
+    }
+
+    function validReading(readingId) {
+      let d = request.resource.data;
+      return readingId.matches('^[0-9a-f]{32}$')
+        && d.schema == 1
+        && d.deviceId is string && d.deviceId.size() > 0 && d.deviceId.size() <= 64
+        && d.receivedAtMs is int
+        && d.receivedAtMs > 1600000000000
+        // Allow a day of phone clock skew, no more.
+        && d.receivedAtMs < request.time.toMillis() + 86400000
+        && d.payloadHex is string && d.payloadHex.matches('^([0-9a-f]{2}){1,32}$')
+        && d.platform in ['android', 'ios']
+        && ((d.kind == 'heartRate' && validHeartRate(d)) || (d.kind == 'bloodPressure' && validBloodPressure(d)));
+    }
+
+    match /users/{uid}/readings/{readingId} {
+      allow get, list: if isOwner(uid);
+      allow create: if isOwner(uid) && validReading(readingId);
+      // A retried upload rewrites the same data. Any real change is refused: readings are a record.
+      allow update: if isOwner(uid) && request.resource.data == resource.data;
+      allow delete: if false;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
